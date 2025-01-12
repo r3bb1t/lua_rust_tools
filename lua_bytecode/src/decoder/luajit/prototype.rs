@@ -56,6 +56,7 @@ impl LuaJitPrototype {
         let raw_flags = read_u8(r)?;
         //let flags = PrototypeFlags::from_bits(raw_flags)
         //    .ok_or(Error::LuaJitInvalidHeaderFlags(raw_flags.into()))?;
+        // TODO: Check if bug is here
         let flags = PrototypeFlags::from_bits_retain(raw_flags);
 
         let arguments_count = read_u8(r)?;
@@ -95,8 +96,6 @@ impl LuaJitPrototype {
             complex_constants_count,
             numeric_constants_count,
         )?;
-
-        //let numeric_constants = BcKnum::read_numeric_constants(r, numeric_constants_count)?;
 
         let endianness = match header.flags.contains(HeaderFlags::BCDUMP_F_BE) {
             true => Endianness::BigEndian,
