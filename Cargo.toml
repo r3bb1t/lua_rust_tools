@@ -1,2 +1,3 @@
 [workspace]
-members = ["lua_decoder"]
+members = ["lua_bytecode"]
+resolver = "1"

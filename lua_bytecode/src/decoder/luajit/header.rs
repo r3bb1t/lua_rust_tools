@@ -1,8 +1,8 @@
-use crate::decoder::{luajit::read_uleb128, util};
+use super::{read_uleb128, util::read_u8, Error, Result};
+use crate::decoder::util::{self, Endianness};
 
-use super::{util::read_u8, Error, Result};
 use bitflags::bitflags;
-use std::{io::Read, usize};
+use std::io::Read;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct LuaJitHeader {
@@ -74,20 +74,18 @@ impl LuaJitHeader {
             Ok(None)
         } else {
             let len = read_uleb128(r)?;
-            //let loaded = Self::load_block(r, len as usize)?;
-            //let as_string = String::from_utf8(loaded)?;
             let as_string = util::read_string(r, len as usize)?;
             Ok(Some(as_string))
         }
     }
+}
 
-    fn load_block<R: Read, T: Into<usize>>(r: &mut R, sz: T) -> Result<Vec<u8>> {
-        let size = sz.into();
-
-        let mut buf = vec![0; size];
-        r.read_exact(&mut buf)?;
-
-        Ok(buf)
+impl From<&HeaderFlags> for Endianness {
+    fn from(val: &HeaderFlags) -> Self {
+        match val.contains(HeaderFlags::BCDUMP_F_BE) {
+            true => Endianness::BigEndian,
+            false => Endianness::LittleEndian,
+        }
     }
 }
 

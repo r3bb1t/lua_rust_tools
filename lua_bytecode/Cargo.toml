@@ -1,0 +1,10 @@
+[package]
+# TODO: find a good name
+# P.s. Maybe collapse decoder and encoder into single crate
+name = "lua_bytecode"
+version = "0.0.1"
+edition = "2021"
+
+[dependencies]
+bitflags = "2.7"
+thiserror = "2.0"

@@ -25,6 +25,9 @@ pub enum Error {
     #[error("Invalid opcode number: {0:#x}")]
     LuaJitInvalidOpcodeNumber(u32),
 
+    #[error("Ivalid debug variable type: {0}")]
+    LuaJitInvalidDebugVariableType(u8),
+
     #[error("An error occured while converting from {0} to {1}")]
     ConvertError(&'static str, &'static str),
 
