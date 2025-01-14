@@ -7,8 +7,11 @@ pub enum Error {
     #[error("Wrong header")]
     WrongHeader,
 
-    #[error("Luajit: wrong flags: {0:#b}")]
+    #[error("Luajit: wrong flags in header: {0:#b}")]
     LuaJitInvalidHeaderFlags(u32),
+
+    #[error("Luajit wrong flags in prototype: {0:#b}")]
+    LuaJitInvalidPrototypeFlags(u32),
 
     #[error("Luajit: Invalid/Unknown version: {0:#x}")]
     LuaJitInvalidVersion(u8),
@@ -43,4 +46,7 @@ pub enum Error {
 
     #[error(transparent)]
     Utf8Error(#[from] core::str::Utf8Error),
+
+    #[error(transparent)]
+    TryFromIntError(#[from] core::num::TryFromIntError),
 }

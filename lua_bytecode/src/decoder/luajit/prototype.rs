@@ -1,9 +1,9 @@
 use super::{
     constants::LuajitConstants,
     debuginfo::DebugInformation,
-    header::{HeaderFlags, LuaJitHeader, LuaJitVersion},
-    opcodes::{LuaJit20Opcode, LuaJit21Opcode, LuaJitOpcode},
-    read_uint, read_uleb128, Error, Result,
+    header::{HeaderFlags, LuaJitHeader},
+    instruction::LuaJitInstruction,
+    read_uleb128, Error, Result,
 };
 use crate::decoder::util::{read_u8, Endianness};
 
@@ -30,8 +30,8 @@ pub struct LuaJitPrototype {
     first_line_number: Option<u32>,
     lines_count: Option<u32>,
 
-    //instructions: Vec<Instruction>,
-    instructions: Vec<LuaJitOpcode>,
+    instructions: Vec<LuaJitInstruction>,
+    //instructions: Vec<LuaJitOpcode>,
     constants: LuajitConstants,
     debug_info: DebugInformation,
 }
@@ -54,10 +54,10 @@ impl LuaJitPrototype {
         };
 
         let raw_flags = read_u8(r)?;
-        //let flags = PrototypeFlags::from_bits(raw_flags)
-        //    .ok_or(Error::LuaJitInvalidHeaderFlags(raw_flags.into()))?;
+        let flags = PrototypeFlags::from_bits(raw_flags)
+            .ok_or(Error::LuaJitInvalidPrototypeFlags(raw_flags.into()))?;
         // TODO: Check if bug is here
-        let flags = PrototypeFlags::from_bits_retain(raw_flags);
+        //let flags = PrototypeFlags::from_bits_retain(raw_flags);
 
         let arguments_count = read_u8(r)?;
         let frame_size = read_u8(r)?;
@@ -86,7 +86,7 @@ impl LuaJitPrototype {
 
         let mut instructions = vec![];
         for _ in 0..instructions_count {
-            let instruction = Self::read_instructions(r, header, &flags)?;
+            let instruction = LuaJitInstruction::from_read(r, header, complex_constants_count)?;
             instructions.push(instruction);
         }
 
@@ -121,33 +121,7 @@ impl LuaJitPrototype {
             debug_info,
         };
 
-        //println!("{:?}", numeric_constants);
-
         Ok(s)
-    }
-
-    fn read_instructions<R: Read>(
-        r: &mut R,
-        luajit_header: &LuaJitHeader,
-        protoype_flags: &PrototypeFlags,
-        //) -> Result<Vec<Instruction>> {
-    ) -> Result<LuaJitOpcode> {
-        //let header = if protoype_flags.contains(PrototypeFlags::FLAG_IS_VARIADIC) {
-        //    InstructionPretty::FuncV
-        //} else {
-        //    InstructionPretty::FuncF
-        //};
-
-        let code_word = read_uint(r, luajit_header.flags.contains(HeaderFlags::BCDUMP_F_BE))?;
-
-        let opcode_raw = code_word & 0xff;
-
-        let opcode = match luajit_header.version {
-            LuaJitVersion::LuaJit2_0 => LuaJitOpcode::Lj20(LuaJit20Opcode::try_from(opcode_raw)?),
-            LuaJitVersion::LuaJit2_1 => LuaJitOpcode::Lj21(LuaJit21Opcode::try_from(opcode_raw)?),
-        };
-
-        Ok(opcode)
     }
 }
 

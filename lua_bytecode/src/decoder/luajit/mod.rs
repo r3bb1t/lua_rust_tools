@@ -1,14 +1,10 @@
-use std::io::Read;
-
+use super::{
+    error::{Error, Result},
+    util::{self, read_u8},
+};
 use header::LuaJitHeader;
 use prototype::LuaJitPrototype;
-
-use crate::decoder::{
-    error::{Error, Result},
-    util,
-};
-
-use super::util::read_u8;
+use std::io::Read;
 
 pub mod constants;
 pub mod debuginfo;
@@ -32,7 +28,10 @@ impl DecodedLuaJitBytecode {
 
         loop {
             match LuaJitPrototype::from_read(&mut r, &header) {
-                Ok(prototype) => prototypes.push(prototype),
+                Ok(prototype) => {
+                    println!("{prototype:#?}");
+                    prototypes.push(prototype)
+                }
                 Err(e) => {
                     eprintln!("{e:?}");
 
@@ -46,6 +45,7 @@ impl DecodedLuaJitBytecode {
             }
         }
 
+        println!("{prototypes:#?}");
         let decoded = Self { header, prototypes };
 
         Ok(decoded)

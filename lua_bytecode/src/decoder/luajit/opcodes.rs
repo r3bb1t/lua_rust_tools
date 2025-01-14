@@ -1,4 +1,7 @@
-use super::{Error, Result};
+use super::{
+    instruction::{ArgumentType, InstructionOperandsFormat},
+    Error, Result,
+};
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum LuaJitOpcode {
@@ -446,6 +449,318 @@ impl TryFrom<u32> for LuaJit20Opcode {
             93 => Ok(Self::FUNCC),
             94 => Ok(Self::FUNCCW),
             _ => Err(Error::LuaJitInvalidOpcodeNumber(value)),
+        }
+    }
+}
+
+impl From<LuaJitOpcode> for [Option<ArgumentType>; 3] {
+    fn from(value: LuaJitOpcode) -> Self {
+        (&value).into()
+    }
+}
+
+impl From<&LuaJitOpcode> for [Option<ArgumentType>; 3] {
+    fn from(value: &LuaJitOpcode) -> Self {
+        match value {
+            LuaJitOpcode::Lj20(lua_jit20_opcode) => lua_jit20_opcode.into(),
+            LuaJitOpcode::Lj21(lua_jit21_opcode) => lua_jit21_opcode.into(),
+        }
+    }
+}
+
+impl From<LuaJit20Opcode> for [Option<ArgumentType>; 3] {
+    fn from(value: LuaJit20Opcode) -> Self {
+        (&value).into()
+    }
+}
+
+impl From<&LuaJit20Opcode> for [Option<ArgumentType>; 3] {
+    fn from(val: &LuaJit20Opcode) -> Self {
+        use ArgumentType::*;
+        use LuaJit20Opcode::*;
+        match val {
+            ISLT | ISGE | ISLE | ISGT | ISEQV | ISNEV => [Some(T_VAR), None, Some(T_VAR)],
+
+            ISEQS | ISNES => [Some(T_VAR), None, Some(T_VAR)],
+
+            ISEQN | ISNEN => [Some(T_VAR), None, Some(T_NUM)],
+
+            ISEQP | ISNEP => [Some(T_VAR), None, Some(T_PRI)],
+
+            ISTC | ISFC => [Some(T_DST), None, Some(T_VAR)],
+
+            IST | ISF => [None, None, Some(T_VAR)],
+
+            // ISTYPE | ISNUM => [Some(T_VAR), None, Some(T_LIT)],
+            MOV | NOT | UNM | LEN => [Some(T_DST), None, Some(T_VAR)],
+
+            CAT => [Some(T_DST), Some(T_RBS), Some(T_RBS)],
+
+            KSTR => [Some(T_DST), None, Some(T_STR)],
+            KCDATA => [Some(T_DST), None, Some(T_CDT)],
+            KSHORT => [Some(T_DST), None, Some(T_SLIT)],
+            KNUM => [Some(T_DST), None, Some(T_NUM)],
+            KPRI => [Some(T_DST), None, Some(T_PRI)],
+
+            KNIL => [Some(T_BS), None, Some(T_BS)],
+
+            UGET => [Some(T_DST), None, Some(T_UV)],
+
+            USETV => [Some(T_UV), None, Some(T_VAR)],
+            USETS => [Some(T_UV), None, Some(T_STR)],
+            USETN => [Some(T_UV), None, Some(T_NUM)],
+            USETP => [Some(T_UV), None, Some(T_PRI)],
+
+            UCLO => [Some(T_RBS), None, Some(T_JMP)],
+
+            FNEW => [Some(T_DST), None, Some(T_FUN)],
+
+            TNEW => [Some(T_DST), None, Some(T_LIT)],
+
+            TDUP => [Some(T_DST), None, Some(T_TAB)],
+
+            GGET => [Some(T_DST), None, Some(T_STR)],
+
+            GSET => [Some(T_VAR), None, Some(T_STR)],
+
+            TGETV => [Some(T_DST), Some(T_VAR), Some(T_VAR)],
+            TGETS => [Some(T_DST), Some(T_VAR), Some(T_STR)],
+            TGETB => [Some(T_DST), Some(T_VAR), Some(T_LIT)],
+            //TGETR => [Some(T_DST), Some(T_VAR), Some(T_VAR)],
+            TSETV => [Some(T_VAR), Some(T_VAR), Some(T_VAR)],
+            TSETS => [Some(T_VAR), Some(T_VAR), Some(T_STR)],
+            TSETB => [Some(T_VAR), Some(T_VAR), Some(T_LIT)],
+
+            TSETM => [Some(T_BS), None, Some(T_NUM)],
+
+            //TSETR => [Some(T_VAR), Some(T_VAR), Some(T_VAR)],
+            CALL | CALLM => [Some(T_BS), Some(T_LIT), Some(T_LIT)],
+
+            CALLMT | CALLT => [Some(T_BS), None, Some(T_LIT)],
+
+            ITERC | ITERN | VARG => [Some(T_BS), Some(T_LIT), Some(T_LIT)],
+
+            ISNEXT => [Some(T_BS), None, Some(T_JMP)],
+
+            RETM => [Some(T_BS), None, Some(T_LIT)],
+            RET | RET0 | RET1 => [Some(T_RBS), None, Some(T_LIT)],
+
+            FORI | JFORI | FORL | IFORL | JFORL | ITERL | IITERL => [Some(T_BS), None, Some(T_JMP)],
+
+            JITERL => [Some(T_BS), None, Some(T_LIT)],
+
+            LOOP | ILOOP => [Some(T_RBS), None, Some(T_LIT)],
+            JLOOP => [Some(T_RBS), None, Some(T_LIT)],
+
+            JMP => [Some(T_RBS), None, Some(T_JMP)],
+
+            FUNCF | IFUNCF | FUNCV | IFUNCV | FUNCC | FUNCCW => [Some(T_RBS), None, None],
+
+            JFUNCF | JFUNCV => [Some(T_RBS), None, Some(T_LIT)],
+
+            ADDVN | SUBVN | MULVN | DIVVN | MODVN | ADDNV | SUBNV | MULNV | DIVNV | MODNV
+            | ADDVV | SUBVV | MULVV | DIVVV | MODVV | POW => {
+                [Some(T_DST), Some(T_VAR), Some(T_NUM)]
+            }
+        }
+    }
+}
+
+impl From<LuaJit21Opcode> for [Option<ArgumentType>; 3] {
+    fn from(val: LuaJit21Opcode) -> Self {
+        (&val).into()
+    }
+}
+
+impl From<&LuaJit21Opcode> for [Option<ArgumentType>; 3] {
+    fn from(val: &LuaJit21Opcode) -> Self {
+        use ArgumentType::*;
+        use LuaJit21Opcode::*;
+        match val {
+            ISLT | ISGE | ISLE | ISGT | ISEQV | ISNEV => [Some(T_VAR), None, Some(T_VAR)],
+
+            ISEQS | ISNES => [Some(T_VAR), None, Some(T_VAR)],
+
+            ISEQN | ISNEN => [Some(T_VAR), None, Some(T_NUM)],
+
+            ISEQP | ISNEP => [Some(T_VAR), None, Some(T_PRI)],
+
+            ISTC | ISFC => [Some(T_DST), None, Some(T_VAR)],
+
+            IST | ISF => [None, None, Some(T_VAR)],
+
+            ISTYPE | ISNUM => [Some(T_VAR), None, Some(T_LIT)],
+            MOV | NOT | UNM | LEN => [Some(T_DST), None, Some(T_VAR)],
+
+            CAT => [Some(T_DST), Some(T_RBS), Some(T_RBS)],
+
+            KSTR => [Some(T_DST), None, Some(T_STR)],
+            KCDATA => [Some(T_DST), None, Some(T_CDT)],
+            KSHORT => [Some(T_DST), None, Some(T_SLIT)],
+            KNUM => [Some(T_DST), None, Some(T_NUM)],
+            KPRI => [Some(T_DST), None, Some(T_PRI)],
+
+            KNIL => [Some(T_BS), None, Some(T_BS)],
+
+            UGET => [Some(T_DST), None, Some(T_UV)],
+
+            USETV => [Some(T_UV), None, Some(T_VAR)],
+            USETS => [Some(T_UV), None, Some(T_STR)],
+            USETN => [Some(T_UV), None, Some(T_NUM)],
+            USETP => [Some(T_UV), None, Some(T_PRI)],
+
+            UCLO => [Some(T_RBS), None, Some(T_JMP)],
+
+            FNEW => [Some(T_DST), None, Some(T_FUN)],
+
+            TNEW => [Some(T_DST), None, Some(T_LIT)],
+
+            TDUP => [Some(T_DST), None, Some(T_TAB)],
+
+            GGET => [Some(T_DST), None, Some(T_STR)],
+
+            GSET => [Some(T_VAR), None, Some(T_STR)],
+
+            TGETV => [Some(T_DST), Some(T_VAR), Some(T_VAR)],
+            TGETS => [Some(T_DST), Some(T_VAR), Some(T_STR)],
+            TGETB => [Some(T_DST), Some(T_VAR), Some(T_LIT)],
+            TGETR => [Some(T_DST), Some(T_VAR), Some(T_VAR)],
+            TSETV => [Some(T_VAR), Some(T_VAR), Some(T_VAR)],
+            TSETS => [Some(T_VAR), Some(T_VAR), Some(T_STR)],
+            TSETB => [Some(T_VAR), Some(T_VAR), Some(T_LIT)],
+
+            TSETM => [Some(T_BS), None, Some(T_NUM)],
+
+            TSETR => [Some(T_VAR), Some(T_VAR), Some(T_VAR)],
+            CALL | CALLM => [Some(T_BS), Some(T_LIT), Some(T_LIT)],
+
+            CALLMT | CALLT => [Some(T_BS), None, Some(T_LIT)],
+
+            ITERC | ITERN | VARG => [Some(T_BS), Some(T_LIT), Some(T_LIT)],
+
+            ISNEXT => [Some(T_BS), None, Some(T_JMP)],
+
+            RETM => [Some(T_BS), None, Some(T_LIT)],
+            RET | RET0 | RET1 => [Some(T_RBS), None, Some(T_LIT)],
+
+            FORI | JFORI | FORL | IFORL | JFORL | ITERL | IITERL => [Some(T_BS), None, Some(T_JMP)],
+
+            JITERL => [Some(T_BS), None, Some(T_LIT)],
+
+            LOOP | ILOOP => [Some(T_RBS), None, Some(T_LIT)],
+            JLOOP => [Some(T_RBS), None, Some(T_LIT)],
+
+            JMP => [Some(T_RBS), None, Some(T_JMP)],
+
+            FUNCF | IFUNCF | FUNCV | IFUNCV | FUNCC | FUNCCW => [Some(T_RBS), None, None],
+
+            JFUNCF | JFUNCV => [Some(T_RBS), None, Some(T_LIT)],
+
+            ADDVN | SUBVN | MULVN | DIVVN | MODVN | ADDNV | SUBNV | MULNV | DIVNV | MODNV
+            | ADDVV | SUBVV | MULVV | DIVVV | MODVV | POW => {
+                [Some(T_DST), Some(T_VAR), Some(T_NUM)]
+            }
+        }
+    }
+}
+
+impl From<LuaJit20Opcode> for InstructionOperandsFormat {
+    fn from(value: LuaJit20Opcode) -> Self {
+        (&value).into()
+    }
+}
+
+impl From<&LuaJit20Opcode> for InstructionOperandsFormat {
+    fn from(value: &LuaJit20Opcode) -> Self {
+        match value {
+            LuaJit20Opcode::ADDVN
+            | LuaJit20Opcode::SUBVN
+            | LuaJit20Opcode::MULVN
+            | LuaJit20Opcode::DIVVN
+            | LuaJit20Opcode::MODVN
+            | LuaJit20Opcode::ADDNV
+            | LuaJit20Opcode::SUBNV
+            | LuaJit20Opcode::MULNV
+            | LuaJit20Opcode::DIVNV
+            | LuaJit20Opcode::MODNV
+            | LuaJit20Opcode::ADDVV
+            | LuaJit20Opcode::SUBVV
+            | LuaJit20Opcode::MULVV
+            | LuaJit20Opcode::DIVVV
+            | LuaJit20Opcode::MODVV
+            | LuaJit20Opcode::POW
+            | LuaJit20Opcode::CAT
+            | LuaJit20Opcode::TGETV
+            | LuaJit20Opcode::TGETS
+            | LuaJit20Opcode::TGETB
+            | LuaJit20Opcode::TSETV
+            | LuaJit20Opcode::TSETS
+            | LuaJit20Opcode::TSETB
+            | LuaJit20Opcode::CALLM
+            | LuaJit20Opcode::CALL
+            | LuaJit20Opcode::ITERC
+            | LuaJit20Opcode::ITERN
+            | LuaJit20Opcode::VARG => Self::Abc,
+            _ => Self::Ad,
+        }
+    }
+}
+
+impl From<LuaJit21Opcode> for InstructionOperandsFormat {
+    fn from(value: LuaJit21Opcode) -> Self {
+        (&value).into()
+    }
+}
+
+impl From<&LuaJit21Opcode> for InstructionOperandsFormat {
+    fn from(value: &LuaJit21Opcode) -> Self {
+        match value {
+            LuaJit21Opcode::ADDVN
+            | LuaJit21Opcode::SUBVN
+            | LuaJit21Opcode::MULVN
+            | LuaJit21Opcode::DIVVN
+            | LuaJit21Opcode::MODVN
+            | LuaJit21Opcode::ADDNV
+            | LuaJit21Opcode::SUBNV
+            | LuaJit21Opcode::MULNV
+            | LuaJit21Opcode::DIVNV
+            | LuaJit21Opcode::MODNV
+            | LuaJit21Opcode::ADDVV
+            | LuaJit21Opcode::SUBVV
+            | LuaJit21Opcode::MULVV
+            | LuaJit21Opcode::DIVVV
+            | LuaJit21Opcode::MODVV
+            | LuaJit21Opcode::POW
+            | LuaJit21Opcode::CAT
+            | LuaJit21Opcode::TGETV
+            | LuaJit21Opcode::TGETS
+            | LuaJit21Opcode::TGETB
+            | LuaJit21Opcode::TGETR
+            | LuaJit21Opcode::TSETV
+            | LuaJit21Opcode::TSETS
+            | LuaJit21Opcode::TSETB
+            | LuaJit21Opcode::TSETR
+            | LuaJit21Opcode::CALLM
+            | LuaJit21Opcode::CALL
+            | LuaJit21Opcode::ITERC
+            | LuaJit21Opcode::ITERN
+            | LuaJit21Opcode::VARG => Self::Abc,
+            _ => Self::Ad,
+        }
+    }
+}
+
+impl From<LuaJitOpcode> for InstructionOperandsFormat {
+    fn from(value: LuaJitOpcode) -> Self {
+        (&value).into()
+    }
+}
+
+impl From<&LuaJitOpcode> for InstructionOperandsFormat {
+    fn from(value: &LuaJitOpcode) -> Self {
+        match value {
+            LuaJitOpcode::Lj20(lua_jit20_opcode) => lua_jit20_opcode.into(),
+            LuaJitOpcode::Lj21(lua_jit21_opcode) => lua_jit21_opcode.into(),
         }
     }
 }

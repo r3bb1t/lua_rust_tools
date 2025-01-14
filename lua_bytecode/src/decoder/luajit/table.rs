@@ -1,6 +1,6 @@
-use crate::decoder::{luajit::read_uleb128, util};
+use super::Result;
 
-use super::{Error, Result};
+use crate::decoder::{luajit::read_uleb128, util};
 use std::io::Read;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
