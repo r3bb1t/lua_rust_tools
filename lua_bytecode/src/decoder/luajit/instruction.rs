@@ -20,7 +20,7 @@ pub(crate) enum InstructionOperandsFormat {
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum InstructionOperands {
     Abc { a: i8, b: i8, c: i8 },
-    Ad { d: u16, a: u8 },
+    Ad { a: u8, d: u16 },
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -96,6 +96,7 @@ impl LuaJitInstruction {
     }
 }
 
+// FIXME: this function is a mess. Sometimes it decodes correctly, sometimes it don't
 fn get_instruction_opeands_v2(
     code_word: u32,
     complex_constants_count: u32,

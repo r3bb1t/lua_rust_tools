@@ -23,7 +23,7 @@ pub(crate) fn read_string<R: Read, T: Into<usize>>(r: &mut R, size: T) -> Result
     Ok(loaded_string)
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub(crate) enum Endianness {
     BigEndian,
     LittleEndian,

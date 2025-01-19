@@ -111,6 +111,7 @@ impl DebugInformation {
     ) -> Result<Self> {
         let addr_to_line_map =
             Self::read_line_info(r, line_offset, header_flags, instructions_count)?;
+
         let upvalue_variables_names = Self::read_upvalue_names(r, up_values_count)?;
         let variable_infos = VariableInfo::read_variable_infos(r, endianness)?;
 

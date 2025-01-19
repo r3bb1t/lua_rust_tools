@@ -51,7 +51,7 @@ pub struct LuaJitTable {
 }
 
 impl LuaJitTable {
-    pub fn read_table<R: Read>(r: &mut R) -> Result<Self> {
+    fn read_table<R: Read>(r: &mut R) -> Result<Self> {
         let array_items_count = read_uleb128(r)?;
         let hash_items_count = read_uleb128(r)?;
 

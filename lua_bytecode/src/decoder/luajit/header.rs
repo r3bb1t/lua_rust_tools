@@ -35,7 +35,7 @@ bitflags! {
 }
 
 impl LuaJitHeader {
-    pub fn from_read<R: Read>(r: &mut R) -> Result<Self> {
+    pub(crate) fn from_read<R: Read>(r: &mut R) -> Result<Self> {
         Self::check_header(r)?;
 
         let version_raw = read_u8(r)?;

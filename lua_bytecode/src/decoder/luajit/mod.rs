@@ -14,10 +14,10 @@ pub mod opcodes;
 pub mod prototype;
 pub mod table;
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct DecodedLuaJitBytecode {
-    header: LuaJitHeader,
-    prototypes: Vec<LuaJitPrototype>,
+    pub header: LuaJitHeader,
+    pub prototypes: Vec<LuaJitPrototype>,
 }
 
 impl DecodedLuaJitBytecode {
@@ -26,26 +26,17 @@ impl DecodedLuaJitBytecode {
 
         let mut prototypes = vec![];
 
+        let mut prototype_count = 0;
         loop {
-            match LuaJitPrototype::from_read(&mut r, &header) {
-                Ok(prototype) => {
-                    println!("{prototype:#?}");
-                    prototypes.push(prototype)
-                }
-                Err(e) => {
-                    eprintln!("{e:?}");
-
-                    match e {
-                        // FIXME: We don't decode every block yet. Crashing here
-                        Error::LuajitInvalidSizeOfChunk => continue,
-                        Error::IoError(_) => break,
-                        _ => return Err(e),
-                    };
-                }
+            match LuaJitPrototype::from_read(&mut r, &header, &mut prototype_count) {
+                Ok(prototype_option) => match prototype_option {
+                    Some(prototype) => prototypes.push(prototype),
+                    None => break,
+                },
+                Err(e) => return Err(e),
             }
         }
 
-        println!("{prototypes:#?}");
         let decoded = Self { header, prototypes };
 
         Ok(decoded)
@@ -87,21 +78,22 @@ fn get_uleb128_33<R: Read>(r: &mut R) -> Result<(bool, u32)> {
     let first_byte: u32 = read_u8(r)?.into();
 
     let is_number_bit = first_byte & 0x1;
-    let mut uleb128_33: u32 = first_byte >> 1u32;
+    let mut value: u32 = first_byte >> 1u32;
 
-    if uleb128_33 >= 0x40 {
-        uleb128_33 &= 0x3F;
+    if value >= 0x40 {
         let mut bit_shift: i8 = -1;
+        value &= 0x3F;
 
         loop {
-            bit_shift += 7;
             let byte: u32 = read_u8(r)?.into();
-            uleb128_33 |= (byte & 0x7F) << bit_shift;
-            if byte >= 0x80 {
+
+            bit_shift += 7;
+            value |= (byte & 0x7F) << bit_shift;
+            if byte < 0x80 {
                 break;
             }
         }
     }
 
-    Ok((is_number_bit != 0, uleb128_33))
+    Ok((is_number_bit != 0, value))
 }

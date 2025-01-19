@@ -1,12 +1,12 @@
 use super::{get_uleb128_33, read_uleb128, Result};
-use crate::decoder::util::{self, read_u8};
+use crate::decoder::util::{self, Endianness};
 
 use std::io::Read;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Table;
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct LuajitConstants {
     pub up_value_references: Vec<u8>,
     pub complex_constants: Vec<ComplexConstantValue>,
@@ -17,13 +17,13 @@ pub struct LuajitConstants {
 pub enum ComplexConstantValue {
     String(String),
     Table,
-    Child(Box<Self>),
+    Child(u32),
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum LuaJitNumericConstant {
     Int(u32),
-    Number(u64),
+    Number(f64),
 }
 
 /// Private since encoder is not implemented yet
@@ -43,21 +43,24 @@ impl LuajitConstants {
         up_values_count: u8,
         complex_constants_count: u32,
         numeric_constants_count: u32,
+        endianness: Endianness,
+        prototype_count: &mut u32,
     ) -> Result<Self> {
         let mut up_value_references = Vec::with_capacity(up_values_count.into());
         for _ in 0..up_values_count {
-            up_value_references.push(read_u8(r)?)
+            up_value_references.push(util::get_varying_size_num(r, 2usize, endianness)?.try_into()?)
         }
 
-        let mut complex_constants = Vec::with_capacity(complex_constants_count as _);
+        let mut complex_constants = Vec::with_capacity(complex_constants_count as usize);
         for _ in 0..complex_constants_count {
-            let complex_constant = ComplexConstantValue::from_read(r)?;
+            let complex_constant =
+                ComplexConstantValue::from_read(r, &endianness, prototype_count)?;
             complex_constants.push(complex_constant);
         }
 
-        let mut numeric_constants = Vec::new();
+        let mut numeric_constants = Vec::with_capacity(numeric_constants_count as usize);
         for _ in 0..numeric_constants_count {
-            let numeric_constant = LuaJitNumericConstant::from_read(r)?;
+            let numeric_constant = LuaJitNumericConstant::from_read(r, &endianness)?;
             numeric_constants.push(numeric_constant);
         }
 
@@ -71,12 +74,20 @@ impl LuajitConstants {
 }
 
 impl ComplexConstantValue {
-    fn from_read<R: Read>(r: &mut R) -> Result<Self> {
+    fn from_read<R: Read>(
+        r: &mut R,
+        endianness: &Endianness,
+        prototype_count: &mut u32,
+    ) -> Result<Self> {
         let constant_type_raw = read_uleb128(r)?;
         let constant_type = ConstantTypeRaw::from(constant_type_raw);
 
         let complex_constant_value = match constant_type {
-            ConstantTypeRaw::Child => todo!(),
+            ConstantTypeRaw::Child => {
+                // FIXME: I don't know how this works (yet) . So don't trust this
+                *prototype_count -= 1;
+                ComplexConstantValue::Child(*prototype_count)
+            }
             ConstantTypeRaw::Tab => todo!(),
             ConstantTypeRaw::I64 => todo!(),
             ConstantTypeRaw::U64 => todo!(),
@@ -93,19 +104,33 @@ impl ComplexConstantValue {
 }
 
 impl LuaJitNumericConstant {
-    fn from_read<R: Read>(r: &mut R) -> Result<Self> {
+    fn from_read<R: Read>(r: &mut R, endianness: &Endianness) -> Result<Self> {
         let (is_num, lo) = get_uleb128_33(r)?;
 
         let bc_k_num = if is_num {
-            //let hi: u64 = read_uleb128(r)?.into();
-            let hi: u64 = lo.into();
+            let hi: u32 = read_uleb128(r)?;
 
-            let uleb128: u64 = read_uleb128(r)?.into();
-            let number = hi | uleb128 << 32;
+            let lo: u64 = lo.into();
+            let hi: u64 = hi.into();
 
-            Self::Number(number)
+            let proper_number = match endianness {
+                Endianness::BigEndian => lo << 32 | hi,
+                Endianness::LittleEndian => hi << 32 | lo,
+            };
+
+            let raw_bytes = match endianness {
+                Endianness::BigEndian => proper_number.to_be_bytes(),
+                Endianness::LittleEndian => proper_number.to_le_bytes(),
+            };
+
+            let resulting = match endianness {
+                Endianness::BigEndian => f64::from_be_bytes(raw_bytes),
+                Endianness::LittleEndian => f64::from_le_bytes(raw_bytes),
+            };
+
+            Self::Number(resulting)
         } else {
-            Self::Int(get_uleb128_33(r)?.1)
+            Self::Int(lo)
         };
 
         Ok(bc_k_num)

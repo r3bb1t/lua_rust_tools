@@ -19,9 +19,6 @@ pub enum Error {
     #[error("Luajit: Invalid constant type: {0:#x}")]
     LuaJitInvalidConstantType(u32),
 
-    #[error("Luajit invalid zero size of chunk")]
-    LuajitInvalidSizeOfChunk,
-
     #[error("Invalid header signature: {0:#x}")]
     LuaJitInvalidSignature(u8),
 

@@ -21,7 +21,7 @@ bitflags! {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct LuaJitPrototype {
     flags: PrototypeFlags,
     arguments_count: u8,
@@ -31,7 +31,6 @@ pub struct LuaJitPrototype {
     lines_count: Option<u32>,
 
     instructions: Vec<LuaJitInstruction>,
-    //instructions: Vec<LuaJitOpcode>,
     constants: LuajitConstants,
     debug_info: DebugInformation,
 }
@@ -46,18 +45,20 @@ enum ConstantType {
 }
 
 impl LuaJitPrototype {
-    pub fn from_read<R: Read>(r: &mut R, header: &LuaJitHeader) -> Result<Self> {
+    pub(crate) fn from_read<R: Read>(
+        r: &mut R,
+        header: &LuaJitHeader,
+        prototype_count: &mut u32,
+    ) -> Result<Option<Self>> {
         let size = read_uleb128(r)?;
 
         if size == 0 {
-            return Err(Error::LuajitInvalidSizeOfChunk);
+            return Ok(None);
         };
 
         let raw_flags = read_u8(r)?;
         let flags = PrototypeFlags::from_bits(raw_flags)
             .ok_or(Error::LuaJitInvalidPrototypeFlags(raw_flags.into()))?;
-        // TODO: Check if bug is here
-        //let flags = PrototypeFlags::from_bits_retain(raw_flags);
 
         let arguments_count = read_u8(r)?;
         let frame_size = read_u8(r)?;
@@ -90,17 +91,19 @@ impl LuaJitPrototype {
             instructions.push(instruction);
         }
 
+        let endianness = match header.flags.contains(HeaderFlags::BCDUMP_F_BE) {
+            true => Endianness::BigEndian,
+            false => Endianness::LittleEndian,
+        };
         let constants = LuajitConstants::from_read(
             r,
             up_values_count,
             complex_constants_count,
             numeric_constants_count,
+            endianness,
+            prototype_count,
         )?;
 
-        let endianness = match header.flags.contains(HeaderFlags::BCDUMP_F_BE) {
-            true => Endianness::BigEndian,
-            false => Endianness::LittleEndian,
-        };
         let debug_info = DebugInformation::from_read(
             r,
             first_line_number.unwrap_or(0),
@@ -110,7 +113,7 @@ impl LuaJitPrototype {
             &endianness,
         )?;
 
-        let s = Self {
+        let prototype = Self {
             flags,
             arguments_count,
             frame_size,
@@ -120,8 +123,9 @@ impl LuaJitPrototype {
             constants,
             debug_info,
         };
+        *prototype_count += 1;
 
-        Ok(s)
+        Ok(Some(prototype))
     }
 }
 
